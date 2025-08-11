@@ -1,0 +1,47 @@
+# Core dependencies for MCP-Notion Sync Service
+
+# Async support
+aiohttp>=3.9.0
+asyncio>=3.4.3
+
+# Notion API
+notion-client>=2.2.0
+
+# GitHub API
+PyGithub>=2.1.1
+
+# Lambda Labs (when SDK available)
+# lambda-cloud>=1.0.0
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0  # For advanced similarity metrics
+
+# Content processing
+beautifulsoup4>=4.12.0
+markdown>=3.5.0
+python-magic>=0.4.27  # File type detection
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+rich>=13.7.0  # Beautiful CLI output
+tqdm>=4.66.0  # Progress bars
+
+# Caching
+diskcache>=5.6.0  # Local caching for embeddings
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Monitoring
+prometheus-client>=0.19.0
+structlog>=24.1.0  # Structured logging
+
+# Database (for state management)
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+aiosqlite>=0.19.0  # Async SQLite

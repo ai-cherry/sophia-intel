@@ -1,0 +1,88 @@
+name: MCP-Notion Sync for Sophia Intel
+
+on:
+  push:
+    branches: [mcp-notion-sync]
+    paths:
+      - 'services/mcp-sync/**'
+      - '.github/workflows/mcp-sync.yml'
+  schedule:
+    - cron: '*/15 * * * *'  # Run every 15 minutes
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: mcp-notion-sync
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('services/mcp-sync/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd services/mcp-sync
+        pip install -r requirements.txt
+    
+    - name: Run sync with deduplication
+      env:
+        LAMBDA_CLOUD_API_KEY: ${{ secrets.LAMBDA_CLOUD_API_KEY }}
+        LAMBDA_API_CLOUD_ENDPOINT: ${{ secrets.LAMBDA_API_CLOUD_ENDPOINT }}
+        GH_FINE_GRAINED_TOKEN: ${{ secrets.GH_FINE_GRAINED_TOKEN }}
+        GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        NOTION_WORKSPACE_ID: ${{ secrets.NOTION_WORKSPACE_ID }}
+      run: |
+        cd services/mcp-sync
+        python sync_manager.py --sync-now
+    
+    - name: Generate deduplication report
+      run: |
+        cd services/mcp-sync
+        python dedup_engine.py --check-duplicates --input-file sync_state.json
+    
+    - name: Upload dedup report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dedup-report-${{ github.run_number }}
+        path: |
+          services/mcp-sync/dedup_report.json
+          services/mcp-sync/logs/*.log
+    
+    - name: Comment PR with stats
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('services/mcp-sync/dedup_report.json', 'utf8'));
+          
+          const comment = `## 📊 Deduplication Report
+          
+          - **Total Processed**: ${report.stats.total_processed}
+          - **Duplicates Prevented**: ${report.stats.duplicates_prevented}
+          - **Content Merged**: ${report.stats.content_merged}
+          - **Efficiency**: ${report.efficiency.dedup_rate}
+          
+          ✅ Sync completed successfully!`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
