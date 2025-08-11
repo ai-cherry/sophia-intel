@@ -1,0 +1,412 @@
+#!/bin/bash
+# Sophia Intel Universal CLI v3.0.0
+# AI-Integrated Repository Management Tool
+# Modular architecture with enhanced features
+
+set -euo pipefail
+
+# Get script directory for relative imports
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+
+# Source library modules
+source "$LIB_DIR/core.sh"
+source "$LIB_DIR/repo_ops.sh"
+source "$LIB_DIR/file_ops.sh"
+source "$LIB_DIR/ai_ops.sh"
+
+# Initialize core functionality
+init_core
+
+# Command line argument parsing
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --branch)
+                switch_branch "$2"
+                shift 2
+                ;;
+            --ai)
+                set_ai_provider "$2"
+                shift 2
+                ;;
+            --dry-run)
+                export DRY_RUN=true
+                shift
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            --help)
+                show_help
+                exit 0
+                ;;
+            config)
+                handle_config_command "$@"
+                exit $?
+                ;;
+            setup)
+                interactive_setup
+                exit 0
+                ;;
+            status)
+                show_status
+                exit 0
+                ;;
+            update)
+                update_cli
+                exit $?
+                ;;
+            *)
+                if [[ "$1" =~ ^-- ]]; then
+                    error "Unknown option: $1"
+                    echo "Use --help for usage information"
+                    exit 1
+                else
+                    # Treat as AI query
+                    process_query "$*"
+                    exit $?
+                fi
+                ;;
+        esac
+    done
+}
+
+# Configuration command handler
+handle_config_command() {
+    shift # Remove 'config'
+    
+    case "${1:-}" in
+        --set-key)
+            if [ $# -lt 3 ]; then
+                error "Usage: sophia config --set-key <provider> <key>"
+                exit 1
+            fi
+            set_api_key "$2" "$3"
+            ;;
+        --get-key)
+            if [ $# -lt 2 ]; then
+                error "Usage: sophia config --get-key <provider>"
+                exit 1
+            fi
+            local key
+            key=$(get_api_key "$2")
+            if [ -n "$key" ]; then
+                echo "API key for $2: ${key:0:10}..."
+            else
+                echo "No API key set for $2"
+            fi
+            ;;
+        --list)
+            show_configuration
+            ;;
+        --reset)
+            reset_configuration
+            ;;
+        --help)
+            show_config_help
+            ;;
+        *)
+            error "Unknown config command: ${1:-}"
+            show_config_help
+            exit 1
+            ;;
+    esac
+}
+
+# Status display
+show_status() {
+    show_header
+    
+    echo -e "${CYAN}Current Configuration:${NC}"
+    echo "• Branch: $SOPHIA_BRANCH"
+    echo "• AI Provider: $AI_PROVIDER"
+    echo "• Config Directory: $CONFIG_DIR"
+    echo
+    
+    echo -e "${CYAN}API Keys Status:${NC}"
+    for provider in claude openai grok github; do
+        local key
+        key=$(get_api_key "$provider")
+        if [ -n "$key" ]; then
+            echo "• $provider: ✓ Configured"
+        else
+            echo "• $provider: ✗ Not configured"
+        fi
+    done
+    echo
+    
+    echo -e "${CYAN}Repository Status:${NC}"
+    get_repo_info "$SOPHIA_BRANCH"
+}
+
+# Configuration display
+show_configuration() {
+    echo -e "${CYAN}Sophia Intel CLI Configuration:${NC}"
+    echo
+    echo "Configuration file: $CONFIG_FILE"
+    echo "Log file: $LOG_FILE"
+    echo
+    echo "Current settings:"
+    echo "• Branch: $SOPHIA_BRANCH"
+    echo "• AI Provider: $AI_PROVIDER"
+    echo "• Preferred Editor: ${PREFERRED_EDITOR:-nano}"
+    echo "• Auto Update: ${AUTO_UPDATE:-true}"
+    echo "• Verbose Logging: ${VERBOSE_LOGGING:-false}"
+    echo
+    echo "API Keys:"
+    for provider in claude openai grok github; do
+        local key
+        key=$(get_api_key "$provider")
+        if [ -n "$key" ]; then
+            echo "• $provider: ${key:0:10}... (configured)"
+        else
+            echo "• $provider: (not configured)"
+        fi
+    done
+}
+
+# Configuration reset
+reset_configuration() {
+    echo -e "${YELLOW}⚠ This will reset all configuration and API keys${NC}"
+    read -p "Are you sure? (y/N): " confirm
+    
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        rm -f "$CONFIG_FILE"
+        success "Configuration reset successfully"
+        info "Run 'sophia setup' to reconfigure"
+    else
+        info "Configuration reset cancelled"
+    fi
+}
+
+# Configuration help
+show_config_help() {
+    echo "Configuration Commands:"
+    echo "  sophia config --set-key <provider> <key>    Set API key"
+    echo "  sophia config --get-key <provider>          Show API key"
+    echo "  sophia config --list                        Show all configuration"
+    echo "  sophia config --reset                       Reset configuration"
+    echo
+    echo "Providers: claude, openai, grok, github"
+}
+
+# CLI update function
+update_cli() {
+    info "Checking for CLI updates..."
+    
+    local latest_url="https://raw.githubusercontent.com/$REPO_NAME/$SOPHIA_BRANCH/cli-tools/sophia-universal-cli"
+    local temp_file
+    temp_file=$(mktemp)
+    
+    if curl -s -f "$latest_url" -o "$temp_file"; then
+        local current_version new_version
+        current_version=$(show_version)
+        new_version=$(grep "# Sophia Intel Universal CLI v" "$temp_file" | head -1 | sed 's/.*v\([0-9.]*\).*/\1/')
+        
+        if [ "$new_version" != "${SOPHIA_VERSION}" ]; then
+            info "New version available: $new_version"
+            read -p "Update to latest version? (y/N): " confirm
+            
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                if cp "$temp_file" "$0" && chmod +x "$0"; then
+                    success "CLI updated to version $new_version"
+                    info "Restart the CLI to use the new version"
+                else
+                    error "Failed to update CLI"
+                    rm -f "$temp_file"
+                    return 1
+                fi
+            fi
+        else
+            success "CLI is already up to date (v$SOPHIA_VERSION)"
+        fi
+    else
+        error "Failed to check for updates"
+        rm -f "$temp_file"
+        return 1
+    fi
+    
+    rm -f "$temp_file"
+}
+
+# Interactive menu system
+show_interactive_menu() {
+    while true; do
+        clear
+        show_header
+        
+        echo -e "${CYAN}Current: Branch=$SOPHIA_BRANCH | AI=$AI_PROVIDER${NC}"
+        echo
+        
+        echo -e "${YELLOW}Repository Operations:${NC}"
+        echo "  1) Repository Information"
+        echo "  2) List Branches"
+        echo "  3) Switch Branch"
+        echo "  4) Recent Commits"
+        echo "  5) Repository Statistics"
+        echo
+        
+        echo -e "${YELLOW}File Operations:${NC}"
+        echo "  6) List Files"
+        echo "  7) View File"
+        echo "  8) Download File"
+        echo "  9) Search Files"
+        echo " 10) File History"
+        echo
+        
+        echo -e "${YELLOW}AI Operations:${NC}"
+        echo " 11) Analyze Repository"
+        echo " 12) Review File"
+        echo " 13) Ask AI Question"
+        echo " 14) Security Analysis"
+        echo " 15) Generate Documentation"
+        echo
+        
+        echo -e "${YELLOW}Advanced Operations:${NC}"
+        echo " 16) Search Code"
+        echo " 17) List Issues"
+        echo " 18) List Pull Requests"
+        echo " 19) Compare Branches"
+        echo " 20) Bulk Download"
+        echo
+        
+        echo -e "${YELLOW}Configuration:${NC}"
+        echo " 21) Show Status"
+        echo " 22) Configure API Keys"
+        echo " 23) Change AI Provider"
+        echo " 24) Update CLI"
+        echo
+        
+        echo -e "${YELLOW}Other:${NC}"
+        echo "  h) Help"
+        echo "  q) Quit"
+        echo
+        
+        read -p "Select option: " choice
+        
+        case $choice in
+            1) get_repo_info "$SOPHIA_BRANCH" ;;
+            2) list_branches ;;
+            3) 
+                echo "Available branches: notion, main, development"
+                read -p "Enter branch name: " branch
+                switch_branch "$branch"
+                ;;
+            4) get_recent_commits "$SOPHIA_BRANCH" ;;
+            5) get_repo_stats "$SOPHIA_BRANCH" ;;
+            6) 
+                read -p "Enter path (default: .): " path
+                list_files "$SOPHIA_BRANCH" "${path:-.}"
+                ;;
+            7)
+                read -p "Enter file path: " file_path
+                if [ -n "$file_path" ]; then
+                    view_file "$file_path" "$SOPHIA_BRANCH"
+                fi
+                ;;
+            8)
+                read -p "Enter file path: " file_path
+                read -p "Enter output path (optional): " output_path
+                if [ -n "$file_path" ]; then
+                    download_file "$file_path" "$SOPHIA_BRANCH" "$output_path"
+                fi
+                ;;
+            9)
+                read -p "Enter search pattern: " pattern
+                if [ -n "$pattern" ]; then
+                    search_files "$pattern" "$SOPHIA_BRANCH"
+                fi
+                ;;
+            10)
+                read -p "Enter file path: " file_path
+                if [ -n "$file_path" ]; then
+                    get_file_history "$file_path" "$SOPHIA_BRANCH"
+                fi
+                ;;
+            11) analyze_repository "$SOPHIA_BRANCH" "$AI_PROVIDER" ;;
+            12)
+                read -p "Enter file path: " file_path
+                if [ -n "$file_path" ]; then
+                    review_file "$file_path" "$SOPHIA_BRANCH" "$AI_PROVIDER"
+                fi
+                ;;
+            13)
+                read -p "Enter your question: " question
+                if [ -n "$question" ]; then
+                    process_query "$question" "repository" "$AI_PROVIDER"
+                fi
+                ;;
+            14)
+                read -p "Enter file path: " file_path
+                if [ -n "$file_path" ]; then
+                    analyze_security "$file_path" "$SOPHIA_BRANCH" "$AI_PROVIDER"
+                fi
+                ;;
+            15)
+                read -p "Enter file path: " file_path
+                if [ -n "$file_path" ]; then
+                    generate_documentation "$file_path" "$SOPHIA_BRANCH" "$AI_PROVIDER"
+                fi
+                ;;
+            16)
+                read -p "Enter search query: " query
+                if [ -n "$query" ]; then
+                    search_code "$query" "$SOPHIA_BRANCH"
+                fi
+                ;;
+            17) list_issues "open" ;;
+            18) list_pull_requests "open" ;;
+            19)
+                read -p "Enter base branch (default: main): " base
+                read -p "Enter head branch (default: $SOPHIA_BRANCH): " head
+                compare_branches "${base:-main}" "${head:-$SOPHIA_BRANCH}"
+                ;;
+            20)
+                read -p "Enter file pattern: " pattern
+                read -p "Enter output directory (default: .): " output_dir
+                if [ -n "$pattern" ]; then
+                    bulk_download "$pattern" "$SOPHIA_BRANCH" "${output_dir:-.}"
+                fi
+                ;;
+            21) show_status ;;
+            22) interactive_setup ;;
+            23)
+                echo "Available providers: claude, gpt, grok"
+                read -p "Enter AI provider: " provider
+                if [ -n "$provider" ]; then
+                    set_ai_provider "$provider"
+                fi
+                ;;
+            24) update_cli ;;
+            h) show_help ;;
+            q) 
+                echo "Goodbye!"
+                exit 0
+                ;;
+            *)
+                error "Invalid option: $choice"
+                ;;
+        esac
+        
+        echo
+        read -p "Press Enter to continue..."
+    done
+}
+
+# Main execution
+main() {
+    # Check if any arguments were provided
+    if [ $# -eq 0 ]; then
+        # No arguments - show interactive menu
+        show_interactive_menu
+    else
+        # Arguments provided - parse them
+        parse_arguments "$@"
+    fi
+}
+
+# Run main function with all arguments
+main "$@"
+
