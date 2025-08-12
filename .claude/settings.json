@@ -1,0 +1,39 @@
+{
+  "model": "sonnet",
+  "temperature": 0.2,
+  "git": {
+    "autoStage": false,
+    "requireDiffApproval": true
+  },
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["openmemory-mcp"],
+      "env": {
+        "OPENMEMORY_STORAGE_DIR": ".claude/memory"
+      }
+    },
+    "openrouter_tools": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/openrouter-mcp.js"],
+      "env": {
+        "OPENROUTER_API_KEY": "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"
+      }
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "FILESYSTEM_ROOT": "/Users/lynnmusil/Projects/sophia-main/sophia-intel-clone"
+      }
+    },
+    "git": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-git"]
+    }
+  }
+}

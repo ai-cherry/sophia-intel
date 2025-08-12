@@ -1,0 +1,62 @@
+{
+  "test_session_1754965294.80781": [
+    {
+      "id": "b3435ab0536865dd5cf8122ce01cb8a2",
+      "content": "The user's name is Lynn Musil and they are working on the Sophia Intel project.",
+      "metadata": {
+        "type": "user_info",
+        "timestamp": "2025-08-11T19:21:34.807814"
+      },
+      "timestamp": "2025-08-11T19:21:34.807838"
+    },
+    {
+      "id": "777dcf82e05ce5ec1dc401b1bd7fb6e6",
+      "content": "The project involves creating an MCP server with AI routing and memory capabilities.",
+      "metadata": {
+        "type": "project_info",
+        "timestamp": "2025-08-11T19:21:34.807817"
+      },
+      "timestamp": "2025-08-11T19:21:34.808118"
+    },
+    {
+      "id": "7a6a2917aa0878fcb9f63f73d65c3ec6",
+      "content": "The system uses Qdrant for vector storage and OpenRouter for embeddings.",
+      "metadata": {
+        "type": "technical_info",
+        "timestamp": "2025-08-11T19:21:34.807818"
+      },
+      "timestamp": "2025-08-11T19:21:34.808425"
+    }
+  ],
+  "demo_session_20250811_192427": [
+    {
+      "id": "4cde3e4208deba1748844c07ec07896e",
+      "content": "This is a demo session for the Sophia Intel MCP server with memory capabilities.",
+      "metadata": {
+        "type": "system",
+        "timestamp": "2025-08-11T19:24:27.971584"
+      },
+      "timestamp": "2025-08-11T19:24:27.971590"
+    }
+  ],
+  "test_session": [
+    {
+      "id": "fcfeb8df0867be961ddcb423695c0fee",
+      "content": "User is Lynn Musil working on Sophia Intel project",
+      "metadata": {
+        "type": "user_info"
+      },
+      "timestamp": "2025-08-11T19:31:18.398104"
+    }
+  ],
+  "branch_analysis": [
+    {
+      "id": "fbfdedd4a415291cdb45aa94f199ebf2",
+      "content": "Analyzing 12 branches: main(115), notion(41), ai-swarm(120), portkey(116), 5 duplicates, 5 outdated feat branches",
+      "metadata": {
+        "type": "analysis"
+      },
+      "timestamp": "2025-08-11T22:56:08.485551"
+    }
+  ]
+}

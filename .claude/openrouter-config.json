@@ -1,0 +1,53 @@
+{
+  "tools": {
+    "plan": {
+      "models": [
+        "anthropic/claude-3-opus-20240229",
+        "deepseek/deepseek-chat"
+      ],
+      "max_tokens": 4096,
+      "temperature": 0.7,
+      "description": "Deep reasoning for architecture and strategy"
+    },
+    "code_special": {
+      "models": [
+        "qwen/qwen-2.5-coder-32b-instruct",
+        "mistralai/mistral-nemo"
+      ],
+      "max_tokens": 4096,
+      "temperature": 0.3,
+      "description": "Specialized coding (tests, docs, refactoring)"
+    },
+    "challenge": {
+      "models": [
+        "x-ai/grok-beta",
+        "openai/gpt-4-turbo-preview"
+      ],
+      "max_tokens": 4096,
+      "temperature": 0.8,
+      "description": "Code review and bug hunting"
+    },
+    "qa_test": {
+      "models": [
+        "google/gemini-2.0-flash-exp",
+        "anthropic/claude-3-haiku-20240307"
+      ],
+      "max_tokens": 4096,
+      "temperature": 0.4,
+      "description": "Test generation and QA"
+    },
+    "doc_review": {
+      "models": [
+        "google/gemini-2.0-flash-exp"
+      ],
+      "max_tokens": 4096,
+      "temperature": 0.5,
+      "description": "Documentation and diagram review"
+    }
+  },
+  "defaults": {
+    "max_retries": 3,
+    "timeout": 30000,
+    "fallback_delay": 1000
+  }
+}

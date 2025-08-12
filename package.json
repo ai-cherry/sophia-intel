@@ -1,0 +1,24 @@
+{
+  "name": "@sophia-aios/monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "dashboard",
+    "mcp-servers/*",
+    "infra/pulumi"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "deploy": "turbo run deploy",
+    "audit:security": "node scripts/audit/security/scan.js",
+    "audit:secrets": "gitleaks detect --source . --verbose"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

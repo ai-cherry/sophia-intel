@@ -1,0 +1,6 @@
+name: sophia-aios
+runtime: nodejs
+description: Sophia AI Operating System Infrastructure
+config:
+  aws:region: us-west-2
+  pulumi:template: kubernetes-typescript

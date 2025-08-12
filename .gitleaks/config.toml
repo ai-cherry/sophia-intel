@@ -1,0 +1,22 @@
+title = "Sophia AIOS Gitleaks Configuration"
+
+[[rules]]
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["key", "openai"]
+
+[[rules]]
+description = "Anthropic API Key"
+regex = '''sk-ant-[a-zA-Z0-9-_]{90,}'''
+tags = ["key", "anthropic"]
+
+[[rules]]
+description = "Generic API Key"
+regex = '''(?i)(api[_\-]?key|apikey)["\']?\s*[:=]\s*["\']?([a-zA-Z0-9\-_]{20,})'''
+tags = ["key", "generic"]
+
+[allowlist]
+paths = [
+  "required-secrets.md",
+  ".env.example"
+]
