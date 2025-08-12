@@ -1,0 +1,135 @@
+name: Sophia AI Swarm Deployment
+
+on:
+  push:
+    branches: [ main, feature/ai-swarm-* ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PORTKEY_API_KEY: ${{ secrets.PORTKEY_API_KEY }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+  GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+  QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+  QDRANT_URL: ${{ secrets.QDRANT_URL }}
+  LAMBDA_API_KEY: ${{ secrets.LAMBDA_API_KEY }}
+  LAMBDA_CLOUD_API_KEY: ${{ secrets.LAMBDA_CLOUD_API_KEY }}
+  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+  PHIDATA_API_KEY: ${{ secrets.PHIDATA_API_KEY }}
+
+jobs:
+  test-swarm-components:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+    
+    - name: Test Portkey Client
+      run: |
+        python -m pytest tests/test_portkey_client.py -v
+    
+    - name: Test Swarm Orchestrator
+      run: |
+        python -m pytest tests/test_swarm_orchestrator.py -v
+    
+    - name: Test Memory System
+      run: |
+        python -m pytest tests/test_memory_system.py -v
+    
+    - name: Test Dashboard
+      run: |
+        python -m pytest tests/test_dashboard.py -v
+
+  deploy-to-lambda-labs:
+    needs: test-swarm-components
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Pulumi CLI
+      uses: pulumi/actions@v4
+    
+    - name: Configure Pulumi
+      run: |
+        pulumi login
+        pulumi stack select sophia-prod || pulumi stack init sophia-prod
+      env:
+        PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+    
+    - name: Deploy Infrastructure
+      run: |
+        cd infrastructure/pulumi
+        pulumi config set --secret lambda:apiKey ${{ secrets.LAMBDA_API_KEY }}
+        pulumi config set --secret lambda:cloudApiKey ${{ secrets.LAMBDA_CLOUD_API_KEY }}
+        pulumi up --yes
+      env:
+        PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+    
+    - name: Deploy Swarm Services
+      run: |
+        # Deploy to Lambda Labs instances
+        python scripts/deploy_swarm.py
+      env:
+        LAMBDA_API_KEY: ${{ secrets.LAMBDA_API_KEY }}
+        LAMBDA_CLOUD_API_KEY: ${{ secrets.LAMBDA_CLOUD_API_KEY }}
+    
+    - name: Run Health Checks
+      run: |
+        python scripts/health_check.py
+      env:
+        DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+    
+    - name: Notify Deployment Status
+      if: always()
+      run: |
+        python scripts/notify_deployment.py
+      env:
+        TELEGRAM_API_KEY: ${{ secrets.TELEGRAM_API_KEY }}
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Secret Scanning
+      run: |
+        pip install detect-secrets
+        detect-secrets scan --all-files --baseline .secrets.baseline
