@@ -1,0 +1,242 @@
+# Sophia AIOS MCP Services Docker Compose
+
+version: '3.9'
+
+services:
+  # Secrets Server - Zero-trust secret distribution
+  secrets-server:
+    build:
+      context: ./mcp-servers/secrets-server
+      dockerfile: Dockerfile
+    container_name: sophia-secrets-server
+    ports:
+      - "8100:8100"
+    environment:
+      - SECRETS_SERVER_JWT_SECRET=${SECRETS_SERVER_JWT_SECRET}
+    volumes:
+      - ./data/secrets:/app/data
+    networks:
+      - sophia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Tool Server - Unified external API interface
+  tool-server:
+    build:
+      context: ./mcp-servers/tool-server
+      dockerfile: Dockerfile
+    container_name: sophia-tool-server
+    ports:
+      - "8101:8101"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+    depends_on:
+      - secrets-server
+    networks:
+      - sophia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Memory Server - Hybrid memory management
+  memory-server:
+    build:
+      context: ./mcp-servers/memory-server
+      dockerfile: Dockerfile
+    container_name: sophia-memory-server
+    ports:
+      - "8102:8102"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - QDRANT_URL=qdrant
+      - QDRANT_PORT=6333
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - qdrant
+      - redis
+      - secrets-server
+    networks:
+      - sophia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Agent Server - AI agent swarm orchestration
+  agent-server:
+    build:
+      context: ./mcp-servers/agent-server
+      dockerfile: Dockerfile
+    container_name: sophia-agent-server
+    ports:
+      - "8103:8103"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PHIDATA_API_KEY=${PHIDATA_API_KEY}
+    depends_on:
+      - memory-server
+      - tool-server
+    volumes:
+      - ./data/agents:/app/data
+    networks:
+      - sophia-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Portkey Gateway - LLM routing and management
+  portkey-gateway:
+    image: portkeyai/gateway:latest
+    container_name: sophia-portkey-gateway
+    ports:
+      - "8787:8787"
+    environment:
+      - PORT=8787
+      - LOG_LEVEL=info
+      - CACHE_TTL=300
+    volumes:
+      - ./config/portkey:/app/config
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: sophia-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    environment:
+      - QDRANT__LOG_LEVEL=INFO
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: sophia-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-sophiaaios}
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Neo4j Knowledge Graph
+  neo4j:
+    image: neo4j:5-enterprise
+    container_name: sophia-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-sophiaaios}
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    volumes:
+      - ./data/neo4j:/data
+      - ./data/neo4j/logs:/logs
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: sophia-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx/sites:/etc/nginx/sites-enabled
+      - ./certs:/etc/nginx/certs
+    depends_on:
+      - secrets-server
+      - tool-server
+      - memory-server
+      - agent-server
+      - portkey-gateway
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sophia-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - ./data/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sophia-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-sophiaaios}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - sophia-network
+    restart: unless-stopped
+
+networks:
+  sophia-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  qdrant-storage:
+  redis-data:
+  neo4j-data:
+  prometheus-data:
+  grafana-data:

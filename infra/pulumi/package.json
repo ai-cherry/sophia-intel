@@ -1,0 +1,25 @@
+{
+  "name": "@sophia-aios/infrastructure",
+  "version": "1.0.0",
+  "description": "Sophia AIOS Infrastructure as Code",
+  "main": "index.ts",
+  "scripts": {
+    "deploy": "pulumi up --yes",
+    "preview": "pulumi preview",
+    "destroy": "pulumi destroy --yes",
+    "refresh": "pulumi refresh",
+    "stack:init": "pulumi stack init sophia-aios-dev",
+    "config:set": "node scripts/set-config.js"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/aws": "^6.0.0",
+    "@pulumi/kubernetes": "^4.0.0",
+    "@pulumi/docker": "^4.0.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
