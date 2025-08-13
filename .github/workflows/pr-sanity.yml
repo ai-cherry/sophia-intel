@@ -1,0 +1,26 @@
+name: PR Sanity
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Block large files
+        run: |
+          MAX=5000000 # 5MB
+          git diff --name-only origin/main... | while read f; do
+            [ -f "$f" ] || continue
+            s=$(wc -c <"$f")
+            if [ "$s" -gt "$MAX" ]; then
+              echo "::error file=$f::File exceeds ${MAX} bytes ($s)"
+              exit 1
+            fi
+          done
+      - name: Secret scan (simple)
+        run: |
+          ! git diff -U0 origin/main... | grep -Ei '(AKIA|ASIA|BEGIN RSA|BEGIN PRIVATE KEY|PULUMI_ACCESS_TOKEN|OPENAI_API_KEY|PORTKEY_API_KEY)'
+          echo "No obvious secrets detected."
+
