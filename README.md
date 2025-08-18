@@ -367,3 +367,40 @@ The GitHub Actions workflow deploys:
 
 # SOPHIA Intel - Production Deployment Sat Aug 16 11:37:41 EDT 2025
 # Deployment trigger Sat Aug 16 13:09:04 EDT 2025
+
+
+## 🐛 **Recent Bug Fixes**
+
+### **Task Persistence Fix - August 18, 2025**
+
+**Issue**: To-do list tasks were not persisting after page refresh.
+
+**Solution**: Implemented localStorage-based persistence in the Task Manager component.
+
+**Changes**:
+- ✅ Added `saveTasks()` and `loadTasks()` functions using localStorage
+- ✅ Tasks now persist across page refreshes
+- ✅ Task completion status maintained
+- ✅ Delete functionality works correctly
+- ✅ Updated documentation in `docs/deployment.md`
+
+**Branch**: `fix/task-persistence`  
+**Deployment**: https://sophia-intel.fly.dev  
+**Status**: ✅ Deployed and verified
+
+**Technical Details**:
+```javascript
+// localStorage persistence functions
+function saveTasks(tasks) {
+    localStorage.setItem('sophia_tasks', JSON.stringify(tasks));
+}
+
+function loadTasks() {
+    return JSON.parse(localStorage.getItem('sophia_tasks') || '[]');
+}
+```
+
+**Testing**: Playwright tests configured for task persistence verification.
+
+**Monitoring**: All actions logged to `/api/v1/monitor/log` endpoint.
+
