@@ -132,7 +132,13 @@ const LoginForm = () => {
 };
 
 // Enhanced Chat Component
+import SafeChatPanel from './SafeChatPanel.jsx';
+
 const EnhancedChatPanel = () => {
+  return <SafeChatPanel />;
+};
+
+const LegacyChatPanel = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);

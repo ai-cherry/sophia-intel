@@ -1,0 +1,93 @@
+name: Dashboard Hotfix Smoke Test
+
+on:
+  push:
+    paths:
+      - 'apps/dashboard/**'
+      - 'mcp_servers/research/**'
+      - '.github/workflows/dashboard-hotfix-smoke-test.yml'
+  pull_request:
+    paths:
+      - 'apps/dashboard/**'
+      - 'mcp_servers/research/**'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: apps/dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: apps/dashboard
+        run: npm ci --legacy-peer-deps
+
+      - name: Build dashboard
+        working-directory: apps/dashboard
+        run: npm run build
+
+      - name: Test research service endpoints
+        env:
+          RESEARCH_URL: https://sophia-research.fly.dev
+        run: |
+          mkdir -p proofs/endpoints
+          
+          # Health check
+          echo "=== Testing Research Health ===" | tee proofs/endpoints/research-health.log
+          curl -i ${RESEARCH_URL}/healthz | tee -a proofs/endpoints/research-health.log
+          
+          # Search endpoint (POST)
+          echo -e "\n=== Testing Research Search POST ===" | tee -a proofs/endpoints/research-search.log
+          curl -s -X POST ${RESEARCH_URL}/search \
+            -H 'Content-Type: application/json' \
+            -d '{"query":"AI orchestration platforms","max_sources":3}' | \
+            tee proofs/endpoints/research-search.json
+          
+          # Validate JSON structure
+          echo -e "\n=== Validating JSON Structure ===" | tee -a proofs/endpoints/research-search.log
+          cat proofs/endpoints/research-search.json | jq -e '.status' > /dev/null
+          cat proofs/endpoints/research-search.json | jq -e '.query' > /dev/null
+          cat proofs/endpoints/research-search.json | jq -e '.results' > /dev/null
+          cat proofs/endpoints/research-search.json | jq -e '.summary' > /dev/null
+          
+          echo "✅ All JSON structure validations passed" | tee -a proofs/endpoints/research-search.log
+
+      - name: Test context service endpoints
+        env:
+          CONTEXT_URL: https://sophia-context-v42.fly.dev
+        run: |
+          # Health check
+          echo "=== Testing Context Health ===" | tee proofs/endpoints/context-health.log
+          curl -i ${CONTEXT_URL}/healthz | tee -a proofs/endpoints/context-health.log
+          
+          # Search endpoint
+          echo -e "\n=== Testing Context Search ===" | tee -a proofs/endpoints/context-search.log
+          curl -s -X POST ${CONTEXT_URL}/search \
+            -H 'Content-Type: application/json' \
+            -d '{"query":"AgentManager","k":3}' | \
+            tee proofs/endpoints/context-search.json
+
+      - name: Commit proof artifacts
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "sophia-hotfix-bot"
+          git config user.email "sophia-hotfix-bot@users.noreply.github.com"
+          git add proofs/endpoints/
+          git commit -m "[proof] dashboard hotfix smoke test - $(date -u +%Y%m%d-%H%M%S)" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Upload proof artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hotfix-smoke-test-proofs
+          path: proofs/endpoints/
+          retention-days: 7
+
