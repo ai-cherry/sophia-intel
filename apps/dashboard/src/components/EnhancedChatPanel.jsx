@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 
 export function EnhancedChatPanel({ 
-  apiBaseUrl = "https://sophia-backend-production-1fc3.up.railway.app",
+  apiBaseUrl = "https://sophia-research.fly.dev",
   voiceEnabled = false,
   audioOutput = false,
   darkMode = true,
