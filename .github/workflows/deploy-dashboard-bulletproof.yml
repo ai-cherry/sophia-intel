@@ -1,0 +1,102 @@
+name: Deploy Dashboard (Bulletproof - No Railway)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/dashboard/**'
+      - '.github/workflows/deploy-dashboard-bulletproof.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-dashboard:
+    runs-on: ubuntu-latest
+    env:
+      APP: sophia-dashboard
+      URL: https://sophia-dashboard.fly.dev
+      VITE_RESEARCH_URL: https://sophia-research.fly.dev
+      VITE_CONTEXT_URL: https://sophia-context-v42.fly.dev
+      VITE_CODE_URL: https://sophia-code.fly.dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Railway killer (block if any refs)
+        run: |
+          set -e
+          mkdir -p proofs/scans
+          MATCH='railway|railway\.app|RW_|RAILWAY_'
+          if git ls-files | xargs -I{} sh -c "grep -nEI \"$MATCH\" \"{}\" 2>/dev/null || true" | tee proofs/scans/railway_scan.txt | grep -qE "$MATCH"; then
+            echo "❌ Railway references found. Clean them up."
+            cat proofs/scans/railway_scan.txt
+            exit 1
+          fi
+          echo "✅ Railway purged completely."
+
+      - name: Preflight (paths + Fly token)
+        env: 
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          [ -n "$FLY_API_TOKEN" ] || { echo "❌ FLY_API_TOKEN missing"; exit 1; }
+          for d in apps/dashboard mcp_servers/research mcp_servers/context; do
+            echo "Checking $d"; ls -la "$d" || exit 1
+          done
+          echo "✅ All paths and token verified."
+
+      - name: Deploy dashboard
+        env: 
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        working-directory: apps/dashboard
+        run: |
+          flyctl apps show $APP >/dev/null 2>&1 || flyctl apps create $APP --machines --yes
+          flyctl deploy \
+            --config ./fly.toml \
+            --dockerfile ./Dockerfile \
+            --build-arg VITE_RESEARCH_URL="$VITE_RESEARCH_URL" \
+            --build-arg VITE_CONTEXT_URL="$VITE_CONTEXT_URL" \
+            --build-arg VITE_CODE_URL="$VITE_CODE_URL" \
+            --build-arg CACHE_BUSTER=${{ github.run_id }} \
+            --no-cache --yes
+
+      - name: Wait for /healthz (dashboard)
+        run: |
+          mkdir -p proofs/healthz
+          for i in $(seq 1 30); do
+            OUT="$(curl -i -sS "$URL/healthz" 2>/dev/null || true)"
+            CODE="$(printf "%s" "$OUT" | head -n1 | awk '{print $2}' || echo 'N/A')"
+            printf "%02d/30 → %s\n" "$i" "${CODE:-N/A}"
+            printf "%s\n" "$OUT" > proofs/healthz/dashboard.txt
+            [ "$CODE" = "200" ] && {
+              echo "✅ Dashboard healthy!"
+              exit 0
+            }
+            sleep 10
+          done
+          echo "❌ Dashboard failed health check after 5 minutes"
+          exit 1
+
+      - name: Test dashboard functionality
+        run: |
+          mkdir -p proofs/functionality
+          # Test that dashboard loads
+          curl -sS "$URL" > proofs/functionality/dashboard_index.html
+          # Test that it contains our app
+          grep -q "SOPHIA" proofs/functionality/dashboard_index.html || {
+            echo "❌ Dashboard doesn't contain SOPHIA app"
+            exit 1
+          }
+          echo "✅ Dashboard functionality verified"
+
+      - name: Commit proofs
+        if: always()
+        run: |
+          git config user.name "sophia-bot"
+          git config user.email "sophia-bot@users.noreply.github.com"
+          git add proofs/healthz/dashboard.txt proofs/scans/railway_scan.txt proofs/functionality/ 2>/dev/null || true
+          git commit -m "[proof] dashboard: health + railway scan + functionality - $(date -u +%Y%m%d-%H%M%S)" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+

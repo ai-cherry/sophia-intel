@@ -1,31 +1,26 @@
-# fly.toml app configuration file generated for sophia-dashboard on 2025-08-21T17:45:00Z
-
 app = "sophia-dashboard"
-primary_region = "iad"
+primary_region = "ord"
 
-[build]
+[env]
+  PORT = "8080"
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 0
+  auto_stop_machines = "stop"
+  min_machines_running = 1
   processes = ["app"]
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "10s"
+    timeout  = "2s"
+    grace_period = "60s"
 
 [[vm]]
   memory = "1gb"
   cpu_kind = "shared"
   cpus = 1
-
-[env]
-  PORT = "8080"
-  NODE_ENV = "production"
-  VITE_RESEARCH_URL = "https://sophia-research.fly.dev"
-  VITE_CONTEXT_URL = "https://sophia-context-v42.fly.dev"
-  VITE_API_URL = "https://sophia-intel.fly.dev"
-
-[[statics]]
-  guest_path = "/app/dist"
-  url_prefix = "/"
 
