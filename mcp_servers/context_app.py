@@ -5,6 +5,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .context_server import router
+from .common.metrics import init_metrics, register_healthz_if_missing
 
 # Create FastAPI app
 app = FastAPI(
@@ -24,6 +25,10 @@ app.add_middleware(
 
 # Include the context router
 app.include_router(router, prefix="", tags=["Context"])
+
+# v4.2 platform invariants
+register_healthz_if_missing(app, "sophia-context-mcp", "4.2.0")
+init_metrics(app, "sophia-context-mcp", "4.2.0")
 
 @app.get("/")
 async def root():
