@@ -1,0 +1,9 @@
+HTTP/2 200 
+date: Thu, 21 Aug 2025 22:44:27 GMT
+server: Fly/2e8436b521 (2025-08-21)
+content-length: 180
+content-type: application/json
+via: 2 fly.io
+fly-request-id: 01K37CW4BPSXBQWPVZKDY73YWE-iad
+
+{"status":"healthy","service":"sophia-mcp-memory","version":"1.0.0","environment":{"NEON_POSTGRES_DSN":"missing","QDRANT_URL":"missing","REDIS_URL":"missing","MEM0_URL":"missing"}}

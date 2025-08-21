@@ -1,0 +1,1 @@
+{"service":"Sophia MCP Server (business)","version":"1.0.0","status":"operational","service_type":"business"}

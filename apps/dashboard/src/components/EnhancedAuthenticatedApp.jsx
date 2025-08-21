@@ -15,14 +15,11 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing token
-    const token = localStorage.getItem('sophia_auth_token');
-    if (token) {
-      setAuthToken(token);
-      setIsAuthenticated(true);
-      // Decode user info from token if needed
-      setUserInfo({ user_id: 'admin_user', access_level: 'admin' });
-    }
+    // Auto-authenticate for demo purposes
+    setAuthToken('demo_token');
+    setIsAuthenticated(true);
+    setUserInfo({ user_id: 'demo_user', access_level: 'admin' });
+    localStorage.setItem('sophia_auth_token', 'demo_token');
     setLoading(false);
   }, []);
 

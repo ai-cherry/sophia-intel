@@ -1,0 +1,18 @@
+{
+  "dashboard_config": {
+    "research_url": "https://sophia-research.fly.dev",
+    "context_url": "https://sophia-context-v42.fly.dev",
+    "code_url": "https://sophia-code.fly.dev"
+  },
+  "environment_variables": {
+    "VITE_RESEARCH_URL": "https://sophia-research.fly.dev",
+    "VITE_CONTEXT_URL": "https://sophia-context-v42.fly.dev",
+    "VITE_CODE_URL": "https://sophia-code.fly.dev"
+  },
+  "verification": {
+    "no_proxy_paths": true,
+    "no_dev_api_paths": true,
+    "production_urls_only": true
+  }
+}
+

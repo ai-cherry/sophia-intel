@@ -1,0 +1,33 @@
+{
+  "research": {
+    "base_url": "https://sophia-research.fly.dev",
+    "endpoints": ["/healthz", "/search"],
+    "status": "operational",
+    "version": "4.2.0"
+  },
+  "context": {
+    "base_url": "https://sophia-context-v42.fly.dev",
+    "endpoints": ["/healthz", "/context/index", "/context/search"],
+    "status": "operational",
+    "version": "4.2.0"
+  },
+  "code": {
+    "base_url": "https://sophia-code.fly.dev",
+    "endpoints": ["/healthz"],
+    "status": "operational",
+    "version": "4.2.0"
+  },
+  "business": {
+    "base_url": "https://sophia-business.fly.dev",
+    "endpoints": ["/healthz"],
+    "status": "operational",
+    "version": "1.0.0"
+  },
+  "memory": {
+    "base_url": "https://sophia-memory.fly.dev",
+    "endpoints": ["/healthz"],
+    "status": "operational",
+    "version": "1.0.0"
+  }
+}
+
