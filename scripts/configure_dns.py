@@ -158,27 +158,27 @@ def configure_sophia_intel_dns():
     existing_records = client.get_domain_records("sophia-intel.ai")
     
     # Define desired DNS configuration
-    # Note: These are placeholder IPs - replace with actual Railway service IPs
+    # Note: These are Fly.dev service endpoints
     dns_config = {
         "www": {
             "type": "CNAME",
-            "content": "sophia-intel-production.up.railway.app"
+            "content": "sophia-dashboard.fly.dev"
         },
         "api": {
             "type": "CNAME", 
-            "content": "api-gateway-production.up.railway.app"
+            "content": "sophia-code.fly.dev"
         },
         "dashboard": {
             "type": "CNAME",
-            "content": "dashboard-production.up.railway.app"
+            "content": "sophia-dashboard.fly.dev"
         },
-        "mcp": {
+        "research": {
             "type": "CNAME",
-            "content": "mcp-server-production.up.railway.app"
+            "content": "sophia-research.fly.dev"
         },
         "@": {
             "type": "CNAME",
-            "content": "sophia-intel-production.up.railway.app"
+            "content": "sophia-dashboard.fly.dev"
         }
     }
     
@@ -208,14 +208,14 @@ def configure_sophia_intel_dns():
     
     print("\n🎉 DNS configuration complete!")
     print("\n📋 Current DNS Configuration:")
-    print("  www.sophia-intel.ai → sophia-intel-production.up.railway.app")
-    print("  api.sophia-intel.ai → api-gateway-production.up.railway.app")
-    print("  dashboard.sophia-intel.ai → dashboard-production.up.railway.app")
-    print("  mcp.sophia-intel.ai → mcp-server-production.up.railway.app")
-    print("  sophia-intel.ai → sophia-intel-production.up.railway.app")
+    print("  www.sophia-intel.ai → sophia-dashboard.fly.dev")
+    print("  api.sophia-intel.ai → sophia-code.fly.dev")
+    print("  dashboard.sophia-intel.ai → sophia-dashboard.fly.dev")
+    print("  research.sophia-intel.ai → sophia-research.fly.dev")
+    print("  sophia-intel.ai → sophia-dashboard.fly.dev")
     
     print("\n⏰ DNS propagation may take up to 24 hours")
-    print("🔒 Remember to configure SSL certificates in Railway")
+    print("🔒 SSL certificates are automatically managed by Fly.dev")
 
 if __name__ == "__main__":
     configure_sophia_intel_dns()

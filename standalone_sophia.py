@@ -48,10 +48,10 @@ class StatusResponse(BaseModel):
     services: dict
     capabilities: list
 
-# Health check endpoint (Railway requirement)
+# Health check endpoint (Fly.io requirement)
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint for Railway deployment"""
+    """Health check endpoint for Fly.io deployment"""
     return HealthResponse(
         status="healthy",
         environment=ENVIRONMENT,
@@ -166,7 +166,7 @@ async def infrastructure():
     """Infrastructure as Code capabilities"""
     return {
         "deployment_platforms": {
-            "railway": "active",
+            "fly_io": "active",
             "lambda_labs": "configured", 
             "neon_database": "connected"
         },
@@ -180,7 +180,7 @@ async def infrastructure():
         "current_resources": {
             "database": "neon_postgresql",
             "cache": "redis",
-            "compute": "railway_containers",
+            "compute": "fly_machines",
             "inference": "lambda_gh200"
         }
     }

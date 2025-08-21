@@ -1,4 +1,0 @@
-name: sophia-intel-infrastructure
-description: SOPHIA Intel Infrastructure as Code with Railway
-runtime: python
-main: __main__.py

@@ -27,7 +27,7 @@ export default function SafeChatPanel() {
     setLoading(true);
 
     try {
-      // Call research service directly - NO RAILWAY ANYWHERE
+      // Call research service directly
       const response = await fetch(`${RESEARCH_URL}/search`, {
         method: 'POST',
         headers: {
@@ -172,7 +172,7 @@ export default function SafeChatPanel() {
       <div className="p-4 border-b border-gray-700">
         <h2 className="text-lg font-semibold">SOPHIA Research Intelligence</h2>
         <p className="text-sm text-gray-400">
-          Connected to: {RESEARCH_URL} (NO RAILWAY!)
+          Connected to: {RESEARCH_URL}
         </p>
       </div>
 
@@ -181,7 +181,7 @@ export default function SafeChatPanel() {
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
             <p>Ask SOPHIA for research and business intelligence...</p>
-            <p className="text-xs mt-2">✅ Railway completely eliminated</p>
+            <p className="text-xs mt-2">✅ Powered by Fly.io</p>
           </div>
         )}
         
