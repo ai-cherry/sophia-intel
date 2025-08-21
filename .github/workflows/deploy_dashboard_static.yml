@@ -1,0 +1,81 @@
+name: Deploy Dashboard (Static)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dashboard_url:
+        description: "Dashboard URL"
+        default: "https://sophia-dashboard.fly.dev"
+        required: false
+
+permissions:
+  contents: write
+
+env:
+  APP: sophia-dashboard
+  URL: ${{ github.event.inputs.dashboard_url || 'https://sophia-dashboard.fly.dev' }}
+  VITE_RESEARCH_URL: https://sophia-research.fly.dev
+  VITE_CONTEXT_URL: https://sophia-context-v42.fly.dev
+  VITE_CODE_URL: https://sophia-code.fly.dev
+  VITE_BUILD_ID: ${{ github.run_id }}
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+
+      - name: Preflight files
+        run: |
+          cd apps/dashboard
+          for f in vite.config.ts nginx.conf Dockerfile.static; do [ -f "$f" ] || { echo "Missing $f"; exit 1; }; done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Build static bundle
+        working-directory: apps/dashboard
+        run: |
+          npm ci --no-audit --no-fund || npm ci --no-audit --no-fund --legacy-peer-deps
+          npm run build
+          test -d dist || (echo "No dist/ created"; exit 1)
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy static image with Dockerfile.static
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          VITE_BUILD_ID: ${{ env.VITE_BUILD_ID }}
+          VITE_RESEARCH_URL: ${{ env.VITE_RESEARCH_URL }}
+          VITE_CONTEXT_URL: ${{ env.VITE_CONTEXT_URL }}
+          VITE_CODE_URL: ${{ env.VITE_CODE_URL }}
+        working-directory: apps/dashboard
+        run: |
+          flyctl apps show $APP >/dev/null 2>&1 || flyctl apps create $APP --machines --yes
+          flyctl deploy \
+            --config ./fly.toml \
+            --dockerfile ./Dockerfile.static \
+            --build-arg VITE_BUILD_ID="$VITE_BUILD_ID" \
+            --build-arg VITE_RESEARCH_URL="$VITE_RESEARCH_URL" \
+            --build-arg VITE_CONTEXT_URL="$VITE_CONTEXT_URL" \
+            --build-arg VITE_CODE_URL="$VITE_CODE_URL" \
+            --build-arg CACHE_BUSTER=${{ github.run_id }} \
+            --no-cache --yes
+
+      - name: Verify /healthz and /__build
+        run: |
+          mkdir -p proofs/healthz proofs/build
+          curl -i ${{ env.URL }}/healthz | tee proofs/healthz/dashboard.txt
+          curl -s ${{ env.URL }}/__build | tee proofs/build/dashboard_build.txt
+
+      - name: Commit proofs
+        run: |
+          git config user.name  "sophia-bot"
+          git config user.email "sophia-bot@users.noreply.github.com"
+          git add proofs/healthz/dashboard.txt proofs/build/dashboard_build.txt
+          git commit -m "[proof] dashboard: static deploy health + build" || true
+          git push || true
+

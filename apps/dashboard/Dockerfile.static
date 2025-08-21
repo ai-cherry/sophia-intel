@@ -1,0 +1,7 @@
+# dashboard/Dockerfile.static
+FROM nginx:alpine
+ENV BUILD_ID=${VITE_BUILD_ID:-manual}
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY dist/ /usr/share/nginx/html
+EXPOSE 8080
+
