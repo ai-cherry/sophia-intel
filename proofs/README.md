@@ -1,43 +1,29 @@
 # Proof Artifacts
 
-This directory contains real artifacts proving functionality:
+This folder stores **real evidence** for every deploy.
 
-- `healthz/` - Health check curl outputs
-- `endpoints/` - API endpoint proofs  
-- `deployments/` - Deployment evidence
+## Structure
+- `healthz/` — `curl -i` of each service's `/healthz` (headers + body)
+- `endpoints/` — JSON results from functional endpoint calls (e.g., research.search, context.search)
+- `manifest-*.json` — machine-readable status snapshots (optional)
+- `manifest-snapshot.json` — latest workflow snapshot (run_id, commit, timestamp)
 
-All files should show headers + body, no mocks/fakes.
+## Policy
+- No mocks or simulations. If a dependency is missing, the service must return **normalized error JSON**.
+- Every PR must attach proofs for the services it touches.
 
-## Example Structure
-
-```
-proofs/
-├── healthz/
-│   ├── sophia-dashboard.txt
-│   ├── sophia-code.txt
-│   └── sophia-research.txt
-├── endpoints/
-│   ├── research-search.txt
-│   └── code-generate.txt
-└── deployments/
-    ├── fly-deploy-output.txt
-    └── github-pr-evidence.txt
-```
-
-## Format Requirements
-
-Each proof file should contain:
-1. Command executed
-2. Full HTTP headers
-3. Complete response body
-4. Timestamp of execution
-
-Example:
+## How to verify locally
 ```bash
-$ curl -i https://sophia-code.fly.dev/healthz
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Wed, 21 Aug 2025 07:00:00 GMT
+curl -i https://sophia-code.fly.dev/healthz
+curl -i https://sophia-research.fly.dev/healthz
+curl -i https://sophia-context-v42.fly.dev/healthz
 
-{"status":"ok","service":"code-server","version":"4.2.0"}
+# Endpoints (examples)
+curl -sS -X POST https://sophia-research.fly.dev/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"AI orchestration platforms","max_sources":5}' | jq .
+
+curl -sS -X POST https://sophia-context-v42.fly.dev/context/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"AgentManager create_swarm","k":5}' | jq .
 ```
