@@ -1,9 +1,12 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100    64  100    64    0     0    523      0 --:--:-- --:--:-- --:--:--   524
 HTTP/2 200 
-date: Thu, 21 Aug 2025 16:43:27 GMT
+date: Thu, 21 Aug 2025 16:52:50 GMT
 server: Fly/6e6a4dd217 (2025-08-21)
 content-length: 64
 content-type: application/json
 via: 2 fly.io, 2 fly.io
-fly-request-id: 01K36R73HYMQQ7QQR76V56T6Z5-iad
+fly-request-id: 01K36RR9T88NRR2N51E9S1YAGH-iad
 
 {"status":"ok","service":"sophia-context-mcp","version":"4.2.0"}

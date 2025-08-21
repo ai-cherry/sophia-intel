@@ -1,0 +1,208 @@
+name: Knowledge Sync — Notion (Company + OKRs)
+
+on:
+  workflow_dispatch:
+    inputs:
+      parent_page_id:
+        description: "Notion parent page id (optional if secret PARENT_PAGE_ID is set)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  NOTION_VERSION: 2022-06-28
+
+jobs:
+  notion-sync:
+    name: Create/Update Notion DBs + Seed RPE KR + Commit Proofs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight (jq + dirs)
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          mkdir -p proofs/notion docs
+
+      - name: Resolve parent page id (input > secret)
+        id: parent
+        shell: bash
+        env:
+          INPUT_PARENT: ${{ github.event.inputs.parent_page_id }}
+          SECRET_PARENT: ${{ secrets.PARENT_PAGE_ID }}
+        run: |
+          PARENT="${INPUT_PARENT:-$SECRET_PARENT}"
+          if [ -z "$PARENT" ]; then
+            echo "No parent_page_id provided and no PARENT_PAGE_ID secret set." >&2
+            echo "Provide one, then rerun." >&2
+            exit 1
+          fi
+          echo "PARENT_PAGE_ID=$PARENT" >> $GITHUB_ENV
+
+      - name: Search Notion for 'Company Knowledge' DB
+        id: search_company
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          curl -sS -X POST https://api.notion.com/v1/search \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"Company Knowledge","filter":{"value":"database","property":"object"}}' \
+            | tee proofs/notion/search_company_knowledge.json >/dev/null
+          COMPANY_DB_ID=$(jq -r '.results[] | select(.title[0].plain_text=="Company Knowledge") | .id' proofs/notion/search_company_knowledge.json | head -n1)
+          echo "COMPANY_DB_ID=$COMPANY_DB_ID" >> $GITHUB_ENV
+
+      - name: Create 'Company Knowledge' DB if missing
+        if: env.COMPANY_DB_ID == ''
+        id: create_company_db
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          PARENT_PAGE_ID: ${{ env.PARENT_PAGE_ID }}
+        run: |
+          curl -sS -X POST "https://api.notion.com/v1/databases" \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" \
+            -H "Content-Type: application/json" \
+            -d @- <<'JSON' | tee proofs/notion/create_company_knowledge.json >/dev/null
+          {
+            "parent": { "page_id": "${PARENT_PAGE_ID}" },
+            "title": [{ "type":"text", "text": { "content":"Company Knowledge" } }],
+            "properties": {
+              "Title": { "title": {} },
+              "Category": { "select": { "options": [
+                {"name":"Company"},{"name":"Product"},{"name":"Strategy"},
+                {"name":"Persona"},{"name":"Integration"},{"name":"Roadmap"},{"name":"Guardrails"}
+              ]}},
+              "Tags": { "multi_select": {} },
+              "Owner": { "people": {} },
+              "Version": { "number": {} },
+              "Last Updated": { "date": {} },
+              "Summary": { "rich_text": {} },
+              "Source URL": { "url": {} }
+            }
+          }
+JSON
+          NEW_ID=$(jq -r '.id' proofs/notion/create_company_knowledge.json)
+          echo "COMPANY_DB_ID=$NEW_ID" >> $GITHUB_ENV
+
+      - name: Search Notion for 'Company OKRs' DB
+        id: search_okrs
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          curl -sS -X POST https://api.notion.com/v1/search \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"Company OKRs","filter":{"value":"database","property":"object"}}' \
+            | tee proofs/notion/search_company_okrs.json >/dev/null
+          OKR_DB_ID=$(jq -r '.results[] | select(.title[0].plain_text=="Company OKRs") | .id' proofs/notion/search_company_okrs.json | head -n1)
+          echo "OKR_DB_ID=$OKR_DB_ID" >> $GITHUB_ENV
+
+      - name: Create 'Company OKRs' DB if missing
+        if: env.OKR_DB_ID == ''
+        id: create_okrs_db
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          PARENT_PAGE_ID: ${{ env.PARENT_PAGE_ID }}
+        run: |
+          curl -sS -X POST "https://api.notion.com/v1/databases" \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" \
+            -H "Content-Type: application/json" \
+            -d @- <<'JSON' | tee proofs/notion/create_company_okrs.json >/dev/null
+          {
+            "parent": { "page_id": "${PARENT_PAGE_ID}" },
+            "title": [{ "type":"text", "text": { "content":"Company OKRs" } }],
+            "properties": {
+              "KR": { "title": {} },
+              "Objective": { "select": { "options": [{ "name":"Improve Revenue per Employee" }] } },
+              "Type": { "select": { "options": [{ "name":"Lagging" },{ "name":"Leading" }] } },
+              "Target": { "number": {} },
+              "Unit": { "select": { "options": [{ "name":"USD/Employee" },{ "name":"%" },{ "name":"#" }] } },
+              "Current": { "number": {} },
+              "Confidence": { "select": { "options": [{ "name":"Low" },{ "name":"Medium" },{ "name":"High" }] } },
+              "Status": { "status": {} },
+              "Last Updated": { "date": {} },
+              "Notes": { "rich_text": {} }
+            }
+          }
+JSON
+          NEW_ID=$(jq -r '.id' proofs/notion/create_company_okrs.json)
+          echo "OKR_DB_ID=$NEW_ID" >> $GITHUB_ENV
+
+      - name: Seed North Star KR (RPE ≥ $1,000,000) if missing
+        id: seed_kr
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          OKR_DB_ID: ${{ env.OKR_DB_ID }}
+        run: |
+          # Query DB for existing KR page
+          curl -sS -X POST "https://api.notion.com/v1/databases/${OKR_DB_ID}/query" \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" \
+            -H "Content-Type: application/json" \
+            -d '{"filter":{"property":"KR","title":{"contains":"RPE ≥ $1,000,000"}}}' \
+            | tee proofs/notion/okr_query_rpe.json >/dev/null
+
+          FOUND=$(jq -r '.results | length' proofs/notion/okr_query_rpe.json)
+          if [ "$FOUND" = "0" ]; then
+            curl -sS -X POST "https://api.notion.com/v1/pages" \
+              -H "Authorization: Bearer ${NOTION_TOKEN}" \
+              -H "Notion-Version: ${NOTION_VERSION}" \
+              -H "Content-Type: application/json" \
+              -d @- <<'JSON' | tee proofs/notion/okr_seed_rpe.json >/dev/null
+            {
+              "parent": { "database_id": "${OKR_DB_ID}" },
+              "properties": {
+                "KR":        { "title": [{ "text": { "content": "RPE ≥ $1,000,000" } }] },
+                "Objective": { "select": { "name": "Improve Revenue per Employee" } },
+                "Type":      { "select": { "name": "Lagging" } },
+                "Target":    { "number": 1000000 },
+                "Unit":      { "select": { "name": "USD/Employee" } },
+                "Current":   { "number": 0 },
+                "Confidence":{ "select": { "name": "Medium" } },
+                "Status":    { "status": { "name": "Not started" } },
+                "Last Updated": { "date": { "start": "2025-08-21" } },
+                "Notes": { "rich_text": [{ "text": { "content": "North Star KR for Pay Ready (sync from Sophia)." } }] }
+              }
+            }
+JSON
+          else
+            echo "KR already exists, skipping seed." | tee proofs/notion/okr_seed_skip.txt >/dev/null
+          fi
+
+      - name: Write docs/KNOWLEDGE_SYNC.md
+        env:
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          NOW="$(date -u +%FT%TZ)"
+          cat > docs/KNOWLEDGE_SYNC.md <<EOF
+# Knowledge Sync — Notion (Company + OKRs)
+
+**Run:** ${RUN_URL}  
+**When (UTC):** ${NOW}
+
+## Databases
+- Company Knowledge DB ID: \`${{ env.COMPANY_DB_ID }}\`
+- Company OKRs DB ID:      \`${{ env.OKR_DB_ID }}\`
+
+## Seed
+- North Star KR: **RPE ≥ \$1,000,000** (Objective: Improve Revenue per Employee)  
+- See: \`proofs/notion/okr_query_rpe.json\` and \`proofs/notion/okr_seed_rpe.json\` (if created)
+
+> This file is auto-generated by the Knowledge Sync workflow. Do not edit by hand.
+EOF
+
+      - name: Commit proofs + docs
+        run: |
+          git config user.name  "sophia-bot"
+          git config user.email "sophia-bot@users.noreply.github.com"
+          git add proofs/notion/*.json proofs/notion/*.txt docs/KNOWLEDGE_SYNC.md
+          git commit -m "[proof] Notion knowledge sync: DBs ensured + RPE KR seeded" || true
+          git push || true
+

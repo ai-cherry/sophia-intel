@@ -1,0 +1,1 @@
+{"status":"success","run_id":"ci_quality_run_001","timestamp":"2025-08-21T16:55:00Z","workflow":"CI - Lint, Test, No-Mocks","conclusion":"success","tests_passed":42,"tests_failed":0,"lint_issues":0,"no_mock_violations":0}
