@@ -5,8 +5,8 @@ on:
     inputs:
       dashboard_url:
         description: "Dashboard URL"
-        default: "https://sophia-dashboard.fly.dev"
         required: false
+        default: "https://sophia-dashboard.fly.dev"
 
 permissions:
   contents: write
@@ -26,32 +26,25 @@ jobs:
       - uses: actions/checkout@v4
         with: { ref: main }
 
-      - name: Preflight files
-        run: |
-          cd apps/dashboard
-          for f in vite.config.js nginx.conf Dockerfile.static; do [ -f "$f" ] || { echo "Missing $f"; exit 1; }; done
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with: { node-version: '20' }
 
-      - name: Build static bundle
+      - name: Build static bundle (vite base '/')
         working-directory: apps/dashboard
         run: |
-          npm ci --no-audit --no-fund || npm ci --no-audit --no-fund --legacy-peer-deps
+          npm ci --no-audit --no-fund --legacy-peer-deps
           npm run build
           test -d dist || (echo "No dist/ created"; exit 1)
 
       - name: Install flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Deploy static image with Dockerfile.static
+      - name: Deploy static image via Dockerfile.static
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           VITE_BUILD_ID: ${{ env.VITE_BUILD_ID }}
           VITE_RESEARCH_URL: ${{ env.VITE_RESEARCH_URL }}
-          VITE_CONTEXT_URL: ${{ env.VITE_CONTEXT_URL }}
-          VITE_CODE_URL: ${{ env.VITE_CODE_URL }}
         working-directory: apps/dashboard
         run: |
           flyctl apps show $APP >/dev/null 2>&1 || flyctl apps create $APP --machines --yes
@@ -60,8 +53,6 @@ jobs:
             --dockerfile ./Dockerfile.static \
             --build-arg VITE_BUILD_ID="$VITE_BUILD_ID" \
             --build-arg VITE_RESEARCH_URL="$VITE_RESEARCH_URL" \
-            --build-arg VITE_CONTEXT_URL="$VITE_CONTEXT_URL" \
-            --build-arg VITE_CODE_URL="$VITE_CODE_URL" \
             --build-arg CACHE_BUSTER=${{ github.run_id }} \
             --no-cache --yes
 
